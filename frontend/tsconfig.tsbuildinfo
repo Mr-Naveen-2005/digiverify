@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/dropzone.tsx","./src/components/layout.tsx","./src/pages/home.tsx","./src/pages/processing.tsx","./src/pages/result.tsx","./src/pages/verify.tsx","./src/services/api.ts","./src/types/index.ts","./src/utils/format.ts"],"version":"5.9.3"}
