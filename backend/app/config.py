@@ -13,8 +13,11 @@ if ENV_PATH.exists():
 
 
 class Settings:
-    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip()
+    # OpenAI-compatible provider (works with OpenAI, OpenRouter, Azure, etc.)
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "").strip()
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
+
     APP_ENV: str = os.getenv("APP_ENV", "development").strip()
     MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "10").strip() or 10)
 
@@ -23,8 +26,8 @@ class Settings:
         return self.MAX_UPLOAD_MB * 1024 * 1024
 
     @property
-    def gemini_enabled(self) -> bool:
-        return bool(self.GEMINI_API_KEY)
+    def openai_enabled(self) -> bool:
+        return bool(self.OPENAI_API_KEY)
 
 
 settings = Settings()

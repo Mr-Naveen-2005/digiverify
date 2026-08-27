@@ -435,12 +435,12 @@ export default function Result() {
         </CheckCard>
       </div>
 
-      {/* Gemini AI Forensics Diagnostic Panel */}
+      {/* OpenAI AI Forensics Diagnostic Panel */}
       <div className="card p-6 sm:p-8 relative overflow-hidden border-signal-border/30">
         <div className="relative space-y-5">
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-signal-cyan">
             <Sparkles className="w-4 h-4 text-signal-cyan" />
-            <span>GEMINI AI EXPLAINABLE FORENSICS</span>
+            <span>OPENAI AI EXPLAINABLE FORENSICS</span>
           </div>
 
           <h2 className="text-xl sm:text-2xl font-extrabold text-text-main">
@@ -449,8 +449,8 @@ export default function Result() {
           </h2>
 
           <p className="text-xs text-text-muted font-mono">
-            {ai.source === 'gemini'
-              ? 'Diagnostic reasoning synthesized by Gemini AI model using multi-modal pipeline telemetry.'
+            {ai.source === 'openai'
+              ? 'Diagnostic reasoning synthesized by an OpenAI-compatible LLM using multi-modal pipeline telemetry.'
               : 'AI engine unavailable — showing rule-based heuristic findings.'}
           </p>
 

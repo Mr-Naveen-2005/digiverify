@@ -1,55 +1,75 @@
-"""Gemini AI explainer.
+"""OpenAI-compatible AI explainer.
 
 The model is given *only* structured evidence from the verification
 pipeline. It returns a strict JSON envelope describing the risk level,
 summary, findings, and recommendation. The frontend renders the
 findings directly — so the explanation is always grounded in the
 evidence the system actually collected.
+
+The module is named `gemini` for historical reasons; it now talks to
+any OpenAI-compatible provider (OpenAI, OpenRouter, Azure, etc.) via
+the `openai` Python SDK.
 """
 from __future__ import annotations
 
 import json
 import logging
 import re
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+import threading
+import time
 from typing import Any, Dict
 
 from ...config import settings
 from ...schemas import AiExplanation, Finding
 
-logger = logging.getLogger("digiverify.gemini")
+logger = logging.getLogger("digiverify.openai")
 
-_MODEL = None
+_CLIENT = None
+_CLIENT_LOCK = threading.Lock()
 _LAST_ERROR: str | None = None
+
+# Per-call timeout for a single chat completion. Render cold-starts plus
+# first-token latency routinely blow past 20s, so 45s gives the model
+# room to respond without spinning forever. Keep well below uvicorn's
+# request timeout so the analyze endpoint can still return.
+_OPENAI_TIMEOUT_S = 45.0
+
+# How many times to retry a transient failure (timeout / 5xx / connection).
+_OPENAI_MAX_ATTEMPTS = 2
 
 
 def last_error() -> str | None:
     return _LAST_ERROR
 
 
-def _load_model():
-    global _MODEL
-    if _MODEL is not None:
-        return _MODEL
-    if not settings.gemini_enabled:
+def _get_client():
+    """Lazily build a shared OpenAI client. Returns None if the key is missing."""
+    global _CLIENT
+    if _CLIENT is not None:
+        return _CLIENT
+    if not settings.openai_enabled:
         return None
-    try:
-        import google.generativeai as genai  # type: ignore
+    with _CLIENT_LOCK:
+        if _CLIENT is not None:
+            return _CLIENT
+        try:
+            from openai import OpenAI  # type: ignore
 
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        _MODEL = genai.GenerativeModel(
-            model_name=settings.GEMINI_MODEL,
-            generation_config={
-                "response_mime_type": "application/json",
-                "temperature": 0.2,
-            },
-        )
-        logger.info("Gemini model %s loaded", settings.GEMINI_MODEL)
-    except Exception as exc:  # pragma: no cover
-        _LAST_ERROR = f"{exc.__class__.__name__}: {exc}"
-        logger.warning("Could not initialise Gemini: %s", exc)
-        _MODEL = None
-    return _MODEL
+            _CLIENT = OpenAI(
+                api_key=settings.OPENAI_API_KEY,
+                base_url=settings.OPENAI_BASE_URL or None,
+                timeout=_OPENAI_TIMEOUT_S,
+            )
+            logger.info(
+                "OpenAI client ready (base_url=%s, model=%s)",
+                settings.OPENAI_BASE_URL or "https://api.openai.com/v1",
+                settings.OPENAI_MODEL,
+            )
+        except Exception as exc:  # pragma: no cover
+            _LAST_ERROR = f"{exc.__class__.__name__}: {exc}"
+            logger.warning("Could not initialise OpenAI client: %s", exc)
+            _CLIENT = None
+    return _CLIENT
 
 
 def _build_prompt(evidence: Dict[str, Any]) -> str:
@@ -118,36 +138,75 @@ def _coerce(data: Dict[str, Any], fallback_level: str) -> AiExplanation:
         summary=str(data.get("summary", "")).strip(),
         findings=findings,
         recommendation=str(data.get("recommendation", "")).strip(),
-        source="gemini",
+        source="openai",
     )
 
 
+def _call_openai(evidence: Dict[str, Any]) -> str:
+    """Submit the prompt and return the assistant's raw text."""
+    client = _get_client()
+    if client is None:
+        raise RuntimeError("openai_unavailable")
+
+    completion = client.chat.completions.create(
+        model=settings.OPENAI_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You respond only with valid JSON matching the schema the "
+                    "user provides. No prose, no markdown fences."
+                ),
+            },
+            {"role": "user", "content": _build_prompt(evidence)},
+        ],
+        temperature=0.2,
+        # Many OpenAI-compatible providers require response_format={"type":"json_object"}
+        # to reliably emit JSON; we set it but degrade gracefully if unsupported.
+        response_format={"type": "json_object"},
+    )
+
+    text = ""
+    try:
+        text = completion.choices[0].message.content or ""
+    except (AttributeError, IndexError, KeyError):
+        text = ""
+    if not text.strip():
+        raise RuntimeError("empty_response")
+    return text
+
+
 def explain(evidence: Dict[str, Any], fallback_level: str) -> AiExplanation:
-    """Call Gemini for a structured explanation; fall back to a rule-based one
-    if anything goes wrong. Never raises."""
-    model = _load_model()
-    if model is None:
+    """Call the OpenAI-compatible model for a structured explanation; fall back
+    to a rule-based one if anything goes wrong. Never raises."""
+    if not settings.openai_enabled or _get_client() is None:
         return _fallback(evidence, fallback_level, reason="unavailable")
 
-    try:
-        with ThreadPoolExecutor(max_workers=1) as ex:
-            future = ex.submit(model.generate_content, _build_prompt(evidence))
-            response = future.result(timeout=20)
-        text = getattr(response, "text", "") or ""
-        parsed = _safe_parse(text)
-        if not parsed:
-            return _fallback(evidence, fallback_level, reason="invalid_response")
-        return _coerce(parsed, fallback_level)
-    except FuturesTimeout:
-        logger.warning("Gemini call timed out after 20s")
-        return _fallback(evidence, fallback_level, reason="timeout")
-    except Exception as exc:
-        msg = str(exc)
-        # Strip very long error text — fall back gracefully
-        if len(msg) > 200:
-            msg = msg[:200] + "…"
-        logger.warning("Gemini call failed: %s", exc)
-        return _fallback(evidence, fallback_level, reason=msg)
+    last_err: str | None = None
+    for attempt in range(1, _OPENAI_MAX_ATTEMPTS + 1):
+        try:
+            text = _call_openai(evidence)
+            parsed = _safe_parse(text)
+            if not parsed:
+                last_err = "invalid_response"
+                logger.warning("OpenAI returned non-JSON (attempt %d)", attempt)
+                continue
+            return _coerce(parsed, fallback_level)
+        except Exception as exc:
+            msg = str(exc)
+            if len(msg) > 200:
+                msg = msg[:200] + "…"
+            last_err = msg
+            logger.warning(
+                "OpenAI call failed (attempt %d/%d): %s",
+                attempt, _OPENAI_MAX_ATTEMPTS, exc,
+            )
+
+        # Backoff between attempts (only if there's another one coming).
+        if attempt < _OPENAI_MAX_ATTEMPTS:
+            time.sleep(1.5 * attempt)
+
+    return _fallback(evidence, fallback_level, reason=last_err or "unavailable")
 
 
 def _fallback(evidence: Dict[str, Any], level: str, reason: str = "unavailable") -> AiExplanation:
@@ -212,14 +271,17 @@ def _fallback(evidence: Dict[str, Any], level: str, reason: str = "unavailable")
         "HIGH": "Manual review is strongly recommended before accepting the identity.",
     }
 
-    if reason not in ("unavailable", "invalid_response"):
-        note = f" (Gemini error: {reason})"
+    # Don't leak raw error strings into the user-visible summary — the
+    # frontend's "AI engine unavailable" copy already tells the user what
+    # happened. Keep the developer note in the recommendation instead.
+    if reason not in ("unavailable", "invalid_response", "timeout"):
+        rec_tail = f" (AI error: {reason})"
     else:
-        note = ""
+        rec_tail = ""
     return AiExplanation(
         risk_level=level,  # type: ignore[arg-type]
-        summary=summary_map.get(level, "Verification completed.") + note,
+        summary=summary_map.get(level, "Verification completed."),
         findings=findings,
-        recommendation=rec_map.get(level, "Manual review is recommended."),
+        recommendation=rec_map.get(level, "Manual review is recommended.") + rec_tail,
         source="fallback",
     )

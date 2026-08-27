@@ -113,7 +113,7 @@ async def analyze(
     # 6) Document type — best-effort label from OCR text
     document_type = _guess_document_type(primary_ocr.raw_text)
 
-    # 7) Gemini explanation
+    # 7) AI explanation
     evidence = {
         "document_type": document_type,
         "verification_type": verification_type,
@@ -146,7 +146,7 @@ async def analyze(
     try:
         explanation = gemini_client.explain(evidence, fallback_level=level)
     except Exception as exc:
-        logger.warning("Gemini explain failed: %s", exc)
+        logger.warning("AI explain failed: %s", exc)
         from ..schemas import AiExplanation
 
         explanation = AiExplanation(

@@ -37,16 +37,18 @@ pip install -r requirements.txt
 Create `backend/.env` (or copy from `backend/.env.example`):
 
 ```env
-GEMINI_API_KEY=your_real_key_here
-GEMINI_MODEL=gemini-flash-latest
+OPENAI_API_KEY=your_real_key_here
+OPENAI_MODEL=openai/gpt-4o-mini
+# Optional: override the base URL to use OpenRouter, Azure, etc.
+# OPENAI_BASE_URL=https://openrouter.ai/api/v1
 APP_ENV=development
 MAX_UPLOAD_MB=10
 ```
 
-Get a Gemini key from <https://aistudio.google.com/apikey>.
-> Models rotate frequently. If you get a `404 models/... is not found`
-> error, run `python -c "import google.generativeai as g; g.configure(api_key='KEY'); [print(m.name) for m in g.list_models() if 'generateContent' in (m.supported_generation_methods or [])]"`
-> and pick a current `gemini-X-flash` model.
+The app uses any **OpenAI-compatible** provider. Defaults work with
+`https://api.openai.com/v1`. For OpenRouter, set `OPENAI_BASE_URL` and
+use a model name like `openai/gpt-4o-mini` (or any model OpenRouter
+exposes). Get an OpenRouter key from <https://openrouter.ai/keys>.
 
 ### 2.2 Frontend
 
@@ -101,9 +103,9 @@ port 8000 — no CORS issues in development.
 | Symptom | Cause | Fix |
 |---|---|---|
 | `ECONNREFUSED ... /api/analyze` | Backend not running | Start uvicorn in terminal 1 |
-| `(Gemini error: 404 ... is not found)` | Model retired | Update `GEMINI_MODEL` in `backend/.env` |
+| `(AI error: 401 ...)` or `invalid_api_key` | Bad/missing `OPENAI_API_KEY` | Set a real key in `backend/.env` |
 | `RiskLeve ... not defined` on startup | Stale code | Already fixed in this repo — `git pull` |
-| Frontend spins forever on "Combining evidence" | Gemini call hanging | Already mitigated — 15s timeout wrapper around Gemini call |
+| Frontend spins forever on "Combining evidence" | AI call hanging | Already mitigated — 45s timeout + retry around the OpenAI call |
 | OCR returns empty | PaddleOCR not installed | Install full requirements, or accept regex fallback |
 
 ---
@@ -195,7 +197,7 @@ Python process — use Render, Railway, Fly.io, or a VPS.
 2. **Root Directory** = `backend`.
 3. Build: `pip install -r requirements.txt`.
 4. Start: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
-5. Add `GEMINI_API_KEY` and `GEMINI_MODEL` env vars.
+5. Add `OPENAI_API_KEY` and `OPENAI_MODEL` env vars (and `OPENAI_BASE_URL` if using OpenRouter/Azure).
 6. After first deploy, update the Vercel env var with the Render URL.
 
 ### CORS for production

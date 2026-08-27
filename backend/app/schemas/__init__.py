@@ -56,7 +56,7 @@ class AiExplanation(BaseModel):
     summary: str = ""
     findings: List[Finding] = Field(default_factory=list)
     recommendation: str = ""
-    source: Literal["gemini", "fallback"] = "fallback"
+    source: Literal["openai", "fallback"] = "fallback"
 
 
 class AnalyzeResponse(BaseModel):
@@ -74,6 +74,6 @@ class AnalyzeResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
-    gemini: bool
+    openai: bool
     ocr: str
     face: str

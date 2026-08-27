@@ -42,7 +42,7 @@ app.include_router(analyze_router, prefix="/api")
 def health() -> HealthResponse:
     return HealthResponse(
         status="ok",
-        gemini=settings.gemini_enabled,
+        openai=settings.openai_enabled,
         ocr=ocr_service.backend_name(),
         face=face_service.backend_name(),
     )

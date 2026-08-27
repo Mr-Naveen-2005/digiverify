@@ -34,7 +34,7 @@ export async function analyze(payload: AnalyzePayload): Promise<AnalyzeResponse>
   return (await res.json()) as AnalyzeResponse;
 }
 
-export async function healthCheck(): Promise<{ status: string; gemini: boolean }> {
+export async function healthCheck(): Promise<{ status: string; openai: boolean }> {
   const res = await fetch(`${API_BASE}/health`);
   if (!res.ok) throw new Error('Backend unreachable');
   return res.json();

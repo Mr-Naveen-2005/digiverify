@@ -48,7 +48,7 @@ export interface AiExplanation {
   summary: string;
   findings: Finding[];
   recommendation: string;
-  source: 'gemini' | 'fallback';
+  source: 'openai' | 'fallback';
 }
 
 export interface AnalyzeResponse {
