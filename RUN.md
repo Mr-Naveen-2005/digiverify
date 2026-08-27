@@ -38,7 +38,7 @@ Create `backend/.env` (or copy from `backend/.env.example`):
 
 ```env
 GEMINI_API_KEY=your_real_key_here
-GEMINI_MODEL=gemini-3.6-flash
+GEMINI_MODEL=gemini-flash-latest
 APP_ENV=development
 MAX_UPLOAD_MB=10
 ```
@@ -147,7 +147,7 @@ git status
 git commit -m "Initial DigiVerify SIH prototype"
 
 # 5. Connect to your remote
-git remote add origin https://github.com/<your-username>/digiverify.git
+git remote add origin https://github.com/Mr-Naveen-2005/digiverify.git
 
 # 6. Push
 git push -u origin main
