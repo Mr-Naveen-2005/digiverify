@@ -14,7 +14,7 @@ if ENV_PATH.exists():
 
 class Settings:
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.6-flash").strip()
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-flash-latest").strip()
     APP_ENV: str = os.getenv("APP_ENV", "development").strip()
     MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "10").strip() or 10)
 

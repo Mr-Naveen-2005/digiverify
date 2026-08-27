@@ -132,18 +132,22 @@ def explain(evidence: Dict[str, Any], fallback_level: str) -> AiExplanation:
     try:
         with ThreadPoolExecutor(max_workers=1) as ex:
             future = ex.submit(model.generate_content, _build_prompt(evidence))
-            response = future.result(timeout=15)
+            response = future.result(timeout=8)
         text = getattr(response, "text", "") or ""
         parsed = _safe_parse(text)
         if not parsed:
             return _fallback(evidence, fallback_level, reason="invalid_response")
         return _coerce(parsed, fallback_level)
     except FuturesTimeout:
-        logger.warning("Gemini call timed out after 15s")
+        logger.warning("Gemini call timed out after 8s")
         return _fallback(evidence, fallback_level, reason="timeout")
     except Exception as exc:
+        msg = str(exc)
+        # Strip very long error text — fall back gracefully
+        if len(msg) > 200:
+            msg = msg[:200] + "…"
         logger.warning("Gemini call failed: %s", exc)
-        return _fallback(evidence, fallback_level, reason=str(exc))
+        return _fallback(evidence, fallback_level, reason=msg)
 
 
 def _fallback(evidence: Dict[str, Any], level: str, reason: str = "unavailable") -> AiExplanation:
