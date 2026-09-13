@@ -8,7 +8,8 @@ from typing import List
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ..config import settings
-from ..schemas import AnalyzeResponse
+from ..core.validators import validate_document_number
+from ..models import AnalyzeResponse
 from ..services import crossdoc, face, ocr, vision
 from ..services.gemini import client as gemini_client
 from ..services.risk import Signals, compute
@@ -64,7 +65,7 @@ async def analyze(
         primary_ocr = ocr.extract(doc_bytes)
     except Exception as exc:
         logger.warning("OCR failed: %s", exc)
-        from ..schemas import OcrData
+        from ..models import OcrData
 
         primary_ocr = OcrData()
 
@@ -73,7 +74,7 @@ async def analyze(
         indicators = vision.analyze(doc_bytes)
     except Exception as exc:
         logger.warning("Vision analysis failed: %s", exc)
-        from ..schemas import DocumentIndicators
+        from ..models import DocumentIndicators
 
         indicators = DocumentIndicators(
             indicators=["Visual analysis could not be completed."],
@@ -85,7 +86,7 @@ async def analyze(
         face_result = face.compare(doc_bytes, photo_bytes)
     except Exception as exc:
         logger.warning("Face comparison failed: %s", exc)
-        from ..schemas import FaceComparison
+        from ..models import FaceComparison
 
         face_result = FaceComparison(
             available=False,
@@ -97,7 +98,7 @@ async def analyze(
         cross = crossdoc.compare(primary_ocr, extra_ocrs)
     except Exception as exc:
         logger.warning("Cross-doc failed: %s", exc)
-        from ..schemas import CrossDocumentResult
+        from ..models import CrossDocumentResult
 
         cross = CrossDocumentResult(message="Cross-document comparison could not be completed.")
 
@@ -112,6 +113,11 @@ async def analyze(
 
     # 6) Document type — best-effort label from OCR text
     document_type = _guess_document_type(primary_ocr.raw_text)
+
+    # Format Validation
+    is_valid_format, format_msg = validate_document_number(
+        document_type, primary_ocr.document_number.value
+    )
 
     # 7) AI explanation
     evidence = {
@@ -140,6 +146,10 @@ async def analyze(
             "matches": cross.matches,
             "mismatches": cross.mismatches,
         },
+        "format_validation": {
+            "is_valid": is_valid_format,
+            "message": format_msg,
+        },
         "risk_score": score,
         "risk_level": level,
     }
@@ -147,7 +157,7 @@ async def analyze(
         explanation = gemini_client.explain(evidence, fallback_level=level)
     except Exception as exc:
         logger.warning("AI explain failed: %s", exc)
-        from ..schemas import AiExplanation
+        from ..models import AiExplanation
 
         explanation = AiExplanation(
             risk_level=level,

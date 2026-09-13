@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..schemas import (
+from ..models import (
     CrossDocumentResult,
     DocumentIndicators,
     FaceComparison,

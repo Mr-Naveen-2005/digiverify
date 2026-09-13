@@ -7,6 +7,7 @@ import {
   Lock,
 } from 'lucide-react';
 import Dropzone from '../components/Dropzone';
+import LiveCamera from '../components/LiveCamera';
 import type { VerificationType } from '../types';
 
 const VERIFICATION_TYPES: VerificationType[] = [
@@ -24,7 +25,6 @@ export default function Verify() {
   const [verificationType, setVerificationType] =
     useState<VerificationType>('General Identity Verification');
   const [docPreview, setDocPreview] = useState<string | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,16 +39,6 @@ export default function Verify() {
     }
     setDocPreview(null);
   }, [document]);
-
-  useEffect(() => {
-    if (!photo) {
-      setPhotoPreview(null);
-      return;
-    }
-    const url = URL.createObjectURL(photo);
-    setPhotoPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [photo]);
 
   const canStart = useMemo(
     () => !!document && !!photo && !error,
@@ -92,12 +82,13 @@ export default function Verify() {
           preview={docPreview}
           onFile={setDocument}
         />
-        <Dropzone
+        <LiveCamera
           label="Facial Biometric Reference"
-          subtitle="Selfie photo capture for spatial embedding & similarity comparison."
-          file={photo}
-          preview={photoPreview}
-          onFile={setPhoto}
+          subtitle="Live selfie capture for spatial embedding & similarity comparison."
+          onCapture={(blob) => {
+            const file = new File([blob], 'live-capture.jpg', { type: 'image/jpeg' });
+            setPhoto(file);
+          }}
         />
       </div>
 

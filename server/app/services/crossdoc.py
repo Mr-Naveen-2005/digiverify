@@ -11,7 +11,7 @@ import re
 from difflib import SequenceMatcher
 from typing import List
 
-from ..schemas import CrossDocumentResult, OcrData
+from ..models import CrossDocumentResult, OcrData
 
 logger = logging.getLogger("digiverify.crossdoc")
 
