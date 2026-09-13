@@ -8,8 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api.analyze import router as analyze_router
-from .schemas import HealthResponse
+from .controllers.analyze import router as analyze_router
+from .models import HealthResponse
 from .services import face as face_service
 from .services import ocr as ocr_service
 from .services.gemini import client as gemini_client

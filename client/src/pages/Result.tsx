@@ -14,6 +14,8 @@ import {
   Lock,
   Cpu,
   Fingerprint,
+  Eye,
+  Scale,
 } from 'lucide-react';
 import type {
   AnalyzeResponse,
@@ -22,9 +24,9 @@ import type {
 } from '../types';
 
 const STATUS_BADGE: Record<RiskLevel, { cls: string; label: string }> = {
-  LOW: { cls: 'badge-success', label: 'PASSED // HIGH TRUST' },
-  REVIEW: { cls: 'badge-warning', label: 'REQUIRES MANUAL AUDIT' },
-  HIGH: { cls: 'badge-danger', label: 'ELEVATED THREAT RISK' },
+  LOW: { cls: 'badge-success', label: 'IDENTITY VERIFIED' },
+  REVIEW: { cls: 'badge-warning', label: 'MANUAL AUDIT REQUIRED' },
+  HIGH: { cls: 'badge-danger', label: 'CRITICAL SECURITY ALERT' },
 };
 
 const SEVERITY_ICON: Record<Severity, typeof Info> = {
@@ -298,144 +300,109 @@ export default function Result() {
         </div>
       </div>
 
-      {/* Detailed Forensic Checks */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <CheckCard
-          symbol="⬡"
-          title="OCR Parsing & Attribute Extraction"
-          status={
-            result.ocr.name.value || result.ocr.document_number.value
-              ? 'PARSED'
-              : 'REVIEW'
-          }
-          tone={
-            result.ocr.name.value || result.ocr.document_number.value
-              ? 'success'
-              : 'warning'
-          }
-          body={
-            result.ocr.name.value || result.ocr.document_number.value
-              ? 'Identity text attributes extracted successfully.'
-              : 'OCR could not extract readable identity fields from document.'
-          }
-        >
-          <div className="mt-3 pt-3 border-t border-signal-border/30">
-            <FieldRow label="Name" value={result.ocr.name.value} />
-            <FieldRow label="Date of Birth" value={result.ocr.dob.value} />
-            <FieldRow
-              label="Document No."
-              value={result.ocr.document_number.value}
-            />
-            <FieldRow label="Gender" value={result.ocr.gender.value} />
-            <FieldRow label="Address" value={result.ocr.address.value} />
+      {/* Evidence Comparison Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card p-6 border-signal-border/30 space-y-4">
+           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-signal-cyan mb-4">
+            <Eye className="w-4 h-4" />
+            <span>BIOMETRIC EVIDENCE MATCH</span>
           </div>
-        </CheckCard>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="text-[10px] text-center text-text-muted uppercase">Credential Photo</div>
+              <div className="aspect-square bg-black rounded-lg border border-signal-border/40 flex items-center justify-center overflow-hidden">
+                <Fingerprint className="w-12 h-12 text-signal-border/20" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="text-[10px] text-center text-text-muted uppercase">Live Capture</div>
+              <div className="aspect-square bg-black rounded-lg border border-signal-border/40 flex items-center justify-center overflow-hidden">
+                <Fingerprint className="w-12 h-12 text-signal-border/20" />
+              </div>
+            </div>
+          </div>
+          <div className="text-center pt-2">
+            <div className="text-xs text-text-secondary flex items-center justify-center gap-2">
+              <Scale className="w-3.5 h-3.5" />
+              Similarity Index: <span className="text-text-main font-bold">{result.face_similarity.similarity?.toFixed(1) || '0.0'}%</span>
+            </div>
+          </div>
+        </div>
 
-        <CheckCard
-          symbol="◎"
-          title="Visual Structure & Anomaly Scan"
-          status={
-            result.document_indicators.anomaly_score < 30
-              ? 'PASSED'
-              : result.document_indicators.anomaly_score < 60
-                ? 'REVIEW'
-                : 'FLAGGED'
-          }
-          tone={
-            result.document_indicators.anomaly_score < 30
-              ? 'success'
-              : result.document_indicators.anomaly_score < 60
-                ? 'warning'
-                : 'danger'
-          }
-          body={
-            result.document_indicators.indicators.length === 0
-              ? 'No suspicious digital edits or visual anomalies detected.'
-              : result.document_indicators.indicators[0]
-          }
-        >
-          {result.document_indicators.indicators.length > 0 && (
-            <ul className="mt-3 pt-3 border-t border-signal-border/30 space-y-1.5 font-mono">
-              {result.document_indicators.indicators.map((ind, i) => (
-                <li
-                  key={i}
-                  className="text-xs text-text-secondary flex items-start gap-2"
-                >
-                  <span className="text-signal-gold">•</span>
-                  <span>{ind}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CheckCard>
+        {/* Detailed Forensic Checks */}
+        <div className="space-y-6">
+          <CheckCard
+            symbol="⬡"
+            title="OCR Parsing & Attribute Extraction"
+            status={
+              result.ocr.name.value || result.ocr.document_number.value
+                ? 'PARSED'
+                : 'REVIEW'
+            }
+            tone={
+              result.ocr.name.value || result.ocr.document_number.value
+                ? 'success'
+                : 'warning'
+            }
+            body={
+              result.ocr.name.value || result.ocr.document_number.value
+                ? 'Identity text attributes extracted successfully.'
+                : 'OCR could not extract readable identity fields from document.'
+            }
+          >
+            <div className="mt-3 pt-3 border-t border-signal-border/30">
+              <FieldRow label="Name" value={result.ocr.name.value} />
+              <FieldRow label="Date of Birth" value={result.ocr.dob.value} />
+              <FieldRow
+                label="Document No."
+                value={result.ocr.document_number.value}
+              />
+              <FieldRow label="Gender" value={result.ocr.gender.value} />
+              <FieldRow label="Address" value={result.ocr.address.value} />
+            </div>
+          </CheckCard>
 
-        <CheckCard
-          symbol="⬡"
-          title="Biometric Face Similarity"
-          status={
-            result.face_similarity.status === 'unavailable'
-              ? 'UNAVAILABLE'
-              : result.face_similarity.status === 'strong'
+          <CheckCard
+            symbol="◎"
+            title="Visual Structure & Anomaly Scan"
+            status={
+              result.document_indicators.anomaly_score < 30
                 ? 'PASSED'
-                : result.face_similarity.status === 'review'
+                : result.document_indicators.anomaly_score < 60
                   ? 'REVIEW'
                   : 'FLAGGED'
-          }
-          tone={
-            result.face_similarity.status === 'unavailable'
-              ? 'info'
-              : result.face_similarity.status === 'strong'
+            }
+            tone={
+              result.document_indicators.anomaly_score < 30
                 ? 'success'
-                : result.face_similarity.status === 'review'
+                : result.document_indicators.anomaly_score < 60
                   ? 'warning'
                   : 'danger'
-          }
-          body={result.face_similarity.message}
-        >
-          <div className="mt-3 pt-3 border-t border-signal-border/30 text-xs text-text-muted">
-            Biometric facial similarity match — zero-trust verification module.
-          </div>
-        </CheckCard>
-
-        <CheckCard
-          symbol="◔"
-          title="Cross-Document Consistency"
-          status={
-            !result.cross_document.available
-              ? 'UNAVAILABLE'
-              : result.cross_document.mismatches.length > 0
-                ? 'MISMATCH'
-                : 'PASSED'
-          }
-          tone={
-            !result.cross_document.available
-              ? 'info'
-              : result.cross_document.mismatches.length > 0
-                ? 'warning'
-                : 'success'
-          }
-          body={result.cross_document.message}
-        >
-          {result.cross_document.available && (
-            <div className="mt-3 pt-3 border-t border-signal-border/30 space-y-1.5 text-xs font-mono">
-              {result.cross_document.matches.map((m, i) => (
-                <div key={`m-${i}`} className="flex items-start gap-2 text-text-secondary">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-signal-green mt-0.5 flex-shrink-0" />
-                  <span>{m}</span>
-                </div>
-              ))}
-              {result.cross_document.mismatches.map((m, i) => (
-                <div key={`mm-${i}`} className="flex items-start gap-2 text-text-secondary">
-                  <AlertTriangle className="w-3.5 h-3.5 text-signal-gold mt-0.5 flex-shrink-0" />
-                  <span>{m}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CheckCard>
+            }
+            body={
+              result.document_indicators.indicators.length === 0
+                ? 'No suspicious digital edits or visual anomalies detected.'
+                : result.document_indicators.indicators[0]
+            }
+          >
+            {result.document_indicators.indicators.length > 0 && (
+              <ul className="mt-3 pt-3 border-t border-signal-border/30 space-y-1.5 font-mono">
+                {result.document_indicators.indicators.map((ind, i) => (
+                  <li
+                    key={i}
+                    className="text-xs text-text-secondary flex items-start gap-2"
+                  >
+                    <span className="text-signal-gold">•</span>
+                    <span>{ind}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CheckCard>
+        </div>
       </div>
 
-      {/* OpenAI AI Forensics Diagnostic Panel */}
+      {/* AI Forensics Diagnostic Panel */}
       <div className="card p-6 sm:p-8 relative overflow-hidden border-signal-border/30">
         <div className="relative space-y-5">
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-signal-cyan">

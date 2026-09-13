@@ -16,7 +16,7 @@ from typing import List, Tuple
 
 from PIL import Image
 
-from ..schemas import OcrData, OcrField
+from ..models import OcrData, OcrField
 
 logger = logging.getLogger("digiverify.ocr")
 
@@ -144,12 +144,29 @@ def _parse_date(boxes: List[_Box]) -> Tuple[str | None, float | None]:
 
 
 def _parse_docnum(boxes: List[_Box]) -> Tuple[str | None, float | None]:
+    # 1. Try finding based on labels first (Current Logic)
     for b in boxes:
         m = _DOCNUM_RX.search(b.text)
         if m:
             return m.group(1), b.confidence
-    full = _join_text(boxes)
-    m = _DOCNUM_RX.search(full)
+
+    # 2. Fuzzy Search: Search the entire document for Aadhaar (12 digits) or PAN patterns
+    full_text = _join_text(boxes)
+
+    # Aadhaar pattern: 12 consecutive digits
+    aadhaar_match = re.search(r"\b\d{12}\b", full_text)
+    if aadhaar_match:
+        logger.info("Fuzzy Match: Found Aadhaar number in raw text")
+        return aadhaar_match.group(0), 0.6  # Lower confidence for fuzzy match
+
+    # PAN pattern: 5 letters, 4 digits, 1 letter
+    pan_match = re.search(r"\b[A-Z]{5}\d{4}[A-Z]{1}\b", full_text.upper())
+    if pan_match:
+        logger.info("Fuzzy Match: Found PAN number in raw text")
+        return pan_match.group(0), 0.6
+
+    # 3. Fallback to existing logic
+    m = _DOCNUM_RX.search(full_text)
     if not m:
         return None, None
     return m.group(1), _avg_conf_for(m.group(0), boxes)

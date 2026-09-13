@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from ..schemas import DocumentIndicators
+from ..models import DocumentIndicators
 
 logger = logging.getLogger("digiverify.vision")
 
